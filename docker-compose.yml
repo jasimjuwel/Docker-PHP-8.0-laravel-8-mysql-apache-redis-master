@@ -1,0 +1,76 @@
+version: '3'
+services:
+  db:
+    image: mysql:8.0
+    container_name: ${APP_NAME}-db
+    ports:
+      - "2201:3306"
+    networks:
+      testing_net:
+        ipv4_address: 149.24.0.2
+    command:
+      - "--default-authentication-plugin=mysql_native_password"
+      - "--innodb-buffer-pool-size=1G"
+      - "--innodb-buffer-pool-instances=2"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: toor
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      TZ: ${TIMEZONE}
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/temp:/dumbs
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: ${APP_NAME}-phpmyadmin
+    ports:
+      - "2202:80"
+    networks:
+      testing_net:
+        ipv4_address: 149.24.0.3
+    depends_on:
+      - db
+  redis:
+    image: "redis:alpine"
+    container_name: ${APP_NAME}-redis
+    ports:
+      - "2203:6379"
+    networks:
+      testing_net:
+        ipv4_address: 149.24.0.5
+  app:
+    container_name: ${APP_NAME}-app
+    build:
+      context: .
+      dockerfile: .docker/apache2/Dockerfile
+      args:
+        uid: ${UID}
+    working_dir: /var/www/html
+    environment:
+      - APACHE_RUN_USER=#${UID}
+      - APACHE_RUN_GROUP=#${UID}
+    ports:
+      - "2204:80"
+      - "2205:443"
+    networks:
+      testing_net:
+        ipv4_address: 149.24.0.4
+    volumes:
+      - .:/var/www/html
+    extra_hosts:
+      - "example.app:149.24.0.4"
+    hostname: example.app
+    domainname: app
+    depends_on:
+      - db
+
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 149.24.0.0/16
